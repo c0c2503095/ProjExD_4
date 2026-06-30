@@ -230,6 +230,31 @@ class Enemy(pg.sprite.Sprite):
             self.state = "stop"
         self.rect.move_ip(self.vx, self.vy)
 
+class Gravity(pg.sprite.Sprite):
+    """
+    追加機能2：重力場に関するクラス
+    """
+    def __init__(self, life: int):
+        """
+        重力場のSurfaceと対応するRectを生成する
+        引数 life：発動時間
+        """
+        super().__init__()
+        self.life = life
+        self.image = pg.Surface((WIDTH, HEIGHT))
+        pg.draw.rect(self.image, (0, 0, 0), (0, 0, WIDTH, HEIGHT))
+        self.image.set_alpha(128)
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (0, 0)
+    
+    def update(self):
+        """
+        発動時間を1減算して、0未満になったらkillになるようにする
+        """
+        self.life -= 1
+        if self.life < 0:
+            self.kill()
+
 
 class Score:
     """
@@ -240,7 +265,7 @@ class Score:
     def __init__(self):
         self.font = pg.font.Font(None, 50)
         self.color = (0, 0, 255)
-        self.value = 0
+        self.value = 1000
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         self.rect = self.image.get_rect()
         self.rect.center = 100, HEIGHT-50
@@ -318,6 +343,7 @@ def main():
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
     effects = pg.sprite.Group() # 追加：オーラのグループ箱
+    gravities = pg.sprite.Group()
 
     tmr = 0
     clock = pg.time.Clock()
@@ -334,6 +360,11 @@ def main():
                     score.value -= 20
             if event.type == pg.KEYDOWN and event.key == pg.K_RSHIFT: # 追加：右シフトでオーラ発動
                 effects.add(NeoBirdEffect(bird))
+
+            if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
+                if score.value > 200:
+                    gravities.add(Gravity(400))
+                    score.value -= 200
 
         screen.blit(bg_img, [0, 0])
 
@@ -361,6 +392,18 @@ def main():
                     bird.change_img(8, screen)  # こうかとん悲しみエフェクト
                     life.life -= 1
                     bird.invincible_time = 50  # 50フレーム(約1秒)の被弾無敵
+        for gravity in gravities:
+            for bomb in pg.sprite.spritecollide(gravity, bombs, True):
+                exps.add(Explosion(bomb, 50))
+            for emy in pg.sprite.spritecollide(gravity, emys, True):
+                exps.add(Explosion(emy, 100))
+
+        for bomb in pg.sprite.spritecollide(bird, bombs, True):  # こうかとんと衝突した爆弾リスト
+            bird.change_img(8, screen)  # こうかとん悲しみエフェクト
+            score.update(screen)
+            pg.display.update()
+            time.sleep(2)
+            return
 
         bird.update(key_lst, screen)
         beams.update()
@@ -373,6 +416,10 @@ def main():
         exps.draw(screen)
         effects.update() # 追加：オーラの更新
         effects.draw(screen) # 追加：オーラの描画
+
+        gravities.update()
+        gravities.draw(screen)
+
         score.update(screen)
         life.update(screen) # 追加：ライフの描画
 
